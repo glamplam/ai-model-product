@@ -5,6 +5,9 @@ const extractBase64 = (dataUrl: string): string => {
   return dataUrl.split(',')[1];
 };
 
+// Helper for delay
+const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 export const generateCompositeImage = async (
   modelImageBase64: string,
   modelMimeType: string,
@@ -22,7 +25,7 @@ export const generateCompositeImage = async (
 
   const ai = new GoogleGenAI({ apiKey: key });
   
-  // Separate complex logic into systemInstruction to avoid confusing the model in the content stream
+  // Separate complex logic into systemInstruction
   const systemInstruction = `
     You are an expert fashion compositor and digital retoucher.
     
@@ -55,34 +58,61 @@ export const generateCompositeImage = async (
     { text: `User Instructions: ${userPrompt}` }
   ];
 
-  try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-pro-image-preview',
-      contents: { parts },
-      config: {
-        systemInstruction: systemInstruction, // Moved here
-        imageConfig: {
-          imageSize: "1K",
-          aspectRatio: "1:1"
-        }
-      }
-    });
+  // Retry Logic
+  let lastError;
+  const maxRetries = 3;
 
-    // Iterate through parts to find the image
-    if (response.candidates && response.candidates[0].content.parts) {
-      for (const part of response.candidates[0].content.parts) {
-        if (part.inlineData && part.inlineData.data) {
-          return `data:image/png;base64,${part.inlineData.data}`;
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      const response = await ai.models.generateContent({
+        model: 'gemini-3-pro-image-preview',
+        contents: { parts },
+        config: {
+          systemInstruction: systemInstruction,
+          imageConfig: {
+            imageSize: "1K",
+            aspectRatio: "1:1"
+          }
+        }
+      });
+
+      // Iterate through parts to find the image
+      if (response.candidates && response.candidates[0].content.parts) {
+        for (const part of response.candidates[0].content.parts) {
+          if (part.inlineData && part.inlineData.data) {
+            return `data:image/png;base64,${part.inlineData.data}`;
+          }
         }
       }
+      
+      throw new Error("No image data found in the response.");
+
+    } catch (error: any) {
+      lastError = error;
+      console.warn(`Attempt ${attempt + 1} failed:`, error.message);
+
+      // Check for retryable errors (503 Overloaded, 500 Internal)
+      const isRetryable = 
+        error.status === 503 || 
+        error.code === 503 || 
+        error.status === 500 ||
+        error.code === 500 ||
+        (error.message && (error.message.includes("overloaded") || error.message.includes("Internal error")));
+
+      if (isRetryable && attempt < maxRetries - 1) {
+        // Exponential backoff: 2s, 4s, 8s
+        const delay = Math.pow(2, attempt + 1) * 1000;
+        console.log(`Retrying in ${delay}ms...`);
+        await wait(delay);
+        continue;
+      }
+
+      // If not retryable or max retries reached, throw the error
+      throw error;
     }
-    
-    throw new Error("No image data found in the response.");
-
-  } catch (error) {
-    console.error("Gemini API Error:", error);
-    throw error;
   }
+
+  throw lastError;
 };
 
 export const editGeneratedImage = async (
@@ -107,29 +137,49 @@ export const editGeneratedImage = async (
     { text: `Edit instruction: ${prompt}` }
   ];
 
-  try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-pro-image-preview',
-      contents: { parts },
-      config: {
-        imageConfig: {
-          imageSize: "1K",
-          aspectRatio: "1:1"
-        }
-      }
-    });
+  // Retry Logic for Edit
+  let lastError;
+  const maxRetries = 3;
 
-    if (response.candidates && response.candidates[0].content.parts) {
-      for (const part of response.candidates[0].content.parts) {
-        if (part.inlineData && part.inlineData.data) {
-          return `data:image/png;base64,${part.inlineData.data}`;
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      const response = await ai.models.generateContent({
+        model: 'gemini-3-pro-image-preview',
+        contents: { parts },
+        config: {
+          imageConfig: {
+            imageSize: "1K",
+            aspectRatio: "1:1"
+          }
+        }
+      });
+
+      if (response.candidates && response.candidates[0].content.parts) {
+        for (const part of response.candidates[0].content.parts) {
+          if (part.inlineData && part.inlineData.data) {
+            return `data:image/png;base64,${part.inlineData.data}`;
+          }
         }
       }
+
+      throw new Error("No image generated during edit.");
+    } catch (error: any) {
+      lastError = error;
+      
+      const isRetryable = 
+        error.status === 503 || 
+        error.code === 503 || 
+        error.status === 500 ||
+        error.code === 500 ||
+        (error.message && (error.message.includes("overloaded") || error.message.includes("Internal error")));
+
+      if (isRetryable && attempt < maxRetries - 1) {
+        const delay = Math.pow(2, attempt + 1) * 1000;
+        await wait(delay);
+        continue;
+      }
+      throw error;
     }
-
-    throw new Error("No image generated during edit.");
-  } catch (error) {
-    console.error("Gemini Edit Error:", error);
-    throw error;
   }
+  throw lastError;
 };
