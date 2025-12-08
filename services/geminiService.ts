@@ -28,39 +28,45 @@ export const generateCompositeImage = async (
   const ai = new GoogleGenAI({ apiKey: key });
   
   // Separate complex logic into systemInstruction
-  // Added strict instructions for text/logo preservation
+  // DRAMATICALLY strengthened instructions for exact product replication
   const systemInstruction = `
-    You are an expert fashion compositor and digital retoucher.
-    
-    TASK:
-    Generate a high-quality photorealistic image of the person from the 'Model Reference' WEARING the item from the 'Product Reference'.
+    ROLE:
+    You are an advanced AI Image Compositor specialized in e-commerce product placement. Your PRIMARY OBJECTIVE is "Pixel-Perfect Product Transfer".
 
-    STRICT RULES:
-    1. **Product Fidelity & Text Preservation**: The 'Product Reference' is the SOURCE OF TRUTH. 
-       - You MUST match its color, texture, and material exactly.
-       - **CRITICAL:** ANY TEXT, LOGOS, OR LABELS on the product must remain legible and identical to the original image. Do not distort, blur, or change the spelling of text on the product.
-    2. **Model Identity**: Preserve the facial features and body type of the 'Model Reference'.
-    3. **Pose & Setting**: Follow the 'User Instructions' for the pose and scene. If the user specifies a pose (e.g., sitting, running), adapt the model to that pose.
-    4. **Realism**: Ensure realistic lighting, shadows, and fabric drape.
+    CRITICAL RULES FOR PRODUCT FIDELITY (SOURCE OF TRUTH):
+    1. **Immutable Product Identity**: The 'Product Reference' image is SACRED. You must composite it onto the model WITHOUT altering its internal design details.
+    2. **Text & Logo Preservation (Zero Hallucination)**: 
+       - Treat all text, labels, and logos on the product as strictly READ-ONLY. 
+       - Perform a mental "Copy and Paste" of the logos/text. 
+       - DO NOT blur, warp, misspell, or "re-imagine" any text. If the label says "BRAND", it must appear exactly as "BRAND" in high definition.
+    3. **Material & Texture**: Preserve the exact fabric weave, material finish (matte/glossy), and color hex code of the product.
+    
+    COMPOSITION RULES:
+    1. **Model Adaptation**: The model (person) must adapt their pose and body shape to fit the product. Do NOT warp the product unnaturally to fit the model.
+    2. **Lighting Integration**: Apply realistic lighting and shadows *around* the product to make it look worn, but ensure the product itself remains the focal point with high clarity.
+    3. **Resolution**: Output at maximum sharpness. Focus specifically on the product area to ensure it is not pixelated.
+
+    TASK:
+    Generate a photorealistic image of the 'Model Reference' wearing the 'Product Reference' according to the 'User Instructions', while maintaining 100% fidelity to the product's original design and text.
   `;
 
   // Simplify the content parts to just the inputs
   const parts: Part[] = [
-    { text: "Model Reference:" },
+    { text: "Model Reference (Target Person):" },
     {
       inlineData: {
         data: modelImageBase64,
         mimeType: modelMimeType
       }
     },
-    { text: "Product Reference (Preserve Text/Logos):" },
+    { text: "Product Reference (DO NOT ALTER TEXT OR LOGOS):" },
     {
       inlineData: {
         data: productImageBase64,
         mimeType: productMimeType
       }
     },
-    { text: `User Instructions: ${userPrompt}` }
+    { text: `Composition Instructions: ${userPrompt} --ensure product text is legible and exact.` }
   ];
 
   // Retry Logic
@@ -101,7 +107,7 @@ export const generateCompositeImage = async (
       const isRetryable = 
         error.status === 503 || 
         error.code === 503 || 
-        error.status === 500 ||
+        error.status === 500 || 
         error.code === 500 ||
         (error.message && (error.message.includes("overloaded") || error.message.includes("Internal error")));
 
