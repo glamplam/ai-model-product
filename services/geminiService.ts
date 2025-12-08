@@ -28,6 +28,7 @@ export const generateCompositeImage = async (
   const ai = new GoogleGenAI({ apiKey: key });
   
   // Separate complex logic into systemInstruction
+  // Added strict instructions for text/logo preservation
   const systemInstruction = `
     You are an expert fashion compositor and digital retoucher.
     
@@ -35,7 +36,9 @@ export const generateCompositeImage = async (
     Generate a high-quality photorealistic image of the person from the 'Model Reference' WEARING the item from the 'Product Reference'.
 
     STRICT RULES:
-    1. **Product Fidelity**: The 'Product Reference' is the source of truth. You MUST match its color, texture, logo, and material exactly.
+    1. **Product Fidelity & Text Preservation**: The 'Product Reference' is the SOURCE OF TRUTH. 
+       - You MUST match its color, texture, and material exactly.
+       - **CRITICAL:** ANY TEXT, LOGOS, OR LABELS on the product must remain legible and identical to the original image. Do not distort, blur, or change the spelling of text on the product.
     2. **Model Identity**: Preserve the facial features and body type of the 'Model Reference'.
     3. **Pose & Setting**: Follow the 'User Instructions' for the pose and scene. If the user specifies a pose (e.g., sitting, running), adapt the model to that pose.
     4. **Realism**: Ensure realistic lighting, shadows, and fabric drape.
@@ -50,7 +53,7 @@ export const generateCompositeImage = async (
         mimeType: modelMimeType
       }
     },
-    { text: "Product Reference:" },
+    { text: "Product Reference (Preserve Text/Logos):" },
     {
       inlineData: {
         data: productImageBase64,
@@ -72,7 +75,8 @@ export const generateCompositeImage = async (
         config: {
           systemInstruction: systemInstruction,
           imageConfig: {
-            imageSize: "1K",
+            // Upgraded to 2K for better text/logo detail resolution
+            imageSize: "2K",
             aspectRatio: "1:1"
           }
         }
@@ -138,7 +142,7 @@ export const editGeneratedImage = async (
         mimeType: 'image/png'
       }
     },
-    { text: `Edit instruction: ${prompt}` }
+    { text: `Edit instruction (Maintain high resolution and text clarity): ${prompt}` }
   ];
 
   // Retry Logic for Edit
@@ -152,7 +156,8 @@ export const editGeneratedImage = async (
         contents: { parts },
         config: {
           imageConfig: {
-            imageSize: "1K",
+            // Upgraded to 2K for edits as well
+            imageSize: "2K",
             aspectRatio: "1:1"
           }
         }
