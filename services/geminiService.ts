@@ -10,14 +10,17 @@ export const generateCompositeImage = async (
   modelMimeType: string,
   productImageBase64: string,
   productMimeType: string,
-  userPrompt: string
+  userPrompt: string,
+  apiKey?: string
 ): Promise<string> => {
   
-  if (!process.env.API_KEY) {
-    throw new Error("API Key is missing. Please set process.env.API_KEY.");
+  const key = apiKey || process.env.API_KEY;
+
+  if (!key) {
+    throw new Error("API Key is missing. Please provide an API key.");
   }
 
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = new GoogleGenAI({ apiKey: key });
   
   const systemPrompt = `
     You are an expert fashion compositor, digital retoucher, and product photographer.
@@ -94,13 +97,15 @@ export const generateCompositeImage = async (
 
 export const editGeneratedImage = async (
   imageBase64: string,
-  prompt: string
+  prompt: string,
+  apiKey?: string
 ): Promise<string> => {
-  if (!process.env.API_KEY) {
+  const key = apiKey || process.env.API_KEY;
+  if (!key) {
     throw new Error("API Key is missing.");
   }
 
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = new GoogleGenAI({ apiKey: key });
 
   const parts: Part[] = [
     {

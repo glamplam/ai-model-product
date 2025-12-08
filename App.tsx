@@ -11,7 +11,8 @@ import {
   AlertCircle,
   Sparkles,
   UserCheck,
-  Key
+  Key,
+  ArrowRight
 } from 'lucide-react';
 
 const PRESET_PROMPTS = [
@@ -25,6 +26,9 @@ const PRESET_PROMPTS = [
 const App: React.FC = () => {
   // State
   const [hasApiKey, setHasApiKey] = useState<boolean>(false);
+  const [customApiKey, setCustomApiKey] = useState<string>("");
+  const [isIdxEnvironment, setIsIdxEnvironment] = useState<boolean>(false);
+  
   const [modelImage, setModelImage] = useState<UploadedImage | null>(null);
   const [productImage, setProductImage] = useState<UploadedImage | null>(null);
   const [status, setStatus] = useState<AppStatus>(AppStatus.IDLE);
@@ -33,25 +37,46 @@ const App: React.FC = () => {
   const [prompt, setPrompt] = useState<string>("");
   const [editPrompt, setEditPrompt] = useState<string>("");
 
-  // Check for API Key on mount
+  // Check for API Key or Environment on mount
   useEffect(() => {
-    const checkApiKey = async () => {
+    const checkEnvironment = async () => {
+      // Check if we are in the specific Google IDX / AI Studio environment
       const aiStudio = (window as any).aistudio;
       if (aiStudio) {
+        setIsIdxEnvironment(true);
         const hasKey = await aiStudio.hasSelectedApiKey();
         setHasApiKey(hasKey);
+      } else {
+        // We are on Vercel/Web. Check if env var was somehow baked in (rare) or wait for manual input
+        if (process.env.API_KEY) {
+          setHasApiKey(true);
+        }
       }
     };
-    checkApiKey();
+    checkEnvironment();
   }, []);
 
   const handleSelectKey = async () => {
     const aiStudio = (window as any).aistudio;
     if (aiStudio) {
       const success = await aiStudio.openSelectKey();
-      // Assume success to mitigate race condition, as per instructions
       setHasApiKey(true);
     }
+  };
+
+  const handleManualKeySubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (customApiKey.trim().length > 10) {
+      setHasApiKey(true);
+    } else {
+      setErrorMessage("Please enter a valid API Key.");
+    }
+  };
+
+  const handleChangeKey = () => {
+    setHasApiKey(false);
+    setCustomApiKey("");
+    setGeneratedImage(null);
   };
 
   const handleApiError = (err: any) => {
@@ -59,10 +84,15 @@ const App: React.FC = () => {
     const msg = err.message || "An error occurred";
     setErrorMessage(msg);
     
-    // Reset key selection if entity not found (invalid key/project)
-    if (msg.includes("Requested entity was not found")) {
-      setHasApiKey(false);
-      setErrorMessage("Session expired or invalid API key. Please select your key again.");
+    if (msg.includes("API Key is missing") || msg.includes("Requested entity was not found") || msg.includes("403")) {
+      // Don't fully reset if it's just a momentary glitch, but provide feedback
+      if (isIdxEnvironment) {
+        setHasApiKey(false);
+        setErrorMessage("Session expired or invalid key. Please reconnect.");
+      } else {
+         // Allow retry with same key or new key
+         setErrorMessage("Invalid API Key or API error. Please check your key.");
+      }
     }
   };
 
@@ -78,12 +108,14 @@ const App: React.FC = () => {
 
     try {
       const finalPrompt = prompt.trim() || "Model wearing the product naturally in a professional studio setting.";
+      // Pass customApiKey if set, otherwise service defaults to process.env
       const resultBase64 = await generateCompositeImage(
         modelImage.base64Data,
         modelImage.mimeType,
         productImage.base64Data,
         productImage.mimeType,
-        finalPrompt
+        finalPrompt,
+        customApiKey || undefined
       );
       setGeneratedImage(resultBase64);
       setStatus(AppStatus.SUCCESS);
@@ -99,12 +131,14 @@ const App: React.FC = () => {
     setErrorMessage(null);
 
     try {
-      // Strip prefix for API if stored with it
       const base64Part = generatedImage.split(',')[1];
-      
-      const resultBase64 = await editGeneratedImage(base64Part, editPrompt);
+      const resultBase64 = await editGeneratedImage(
+        base64Part, 
+        editPrompt,
+        customApiKey || undefined
+      );
       setGeneratedImage(resultBase64);
-      setEditPrompt(""); // Clear input
+      setEditPrompt(""); 
       setStatus(AppStatus.SUCCESS);
     } catch (err: any) {
       handleApiError(err);
@@ -122,7 +156,7 @@ const App: React.FC = () => {
     }
   };
 
-  // Landing Page for API Key Selection
+  // Landing Page: Key Selection
   if (!hasApiKey) {
     return (
       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4 relative overflow-hidden">
@@ -139,26 +173,63 @@ const App: React.FC = () => {
             <p className="text-slate-400">Professional product composition using Gemini 3 Pro.</p>
           </div>
 
-          <div className="p-4 bg-slate-800/50 rounded-xl border border-slate-700/50 text-sm text-slate-300">
-            To use the high-quality image model, you must select a paid Google Cloud Project API key.
-          </div>
+          {errorMessage && (
+             <div className="text-red-400 text-sm bg-red-500/10 p-2 rounded-lg border border-red-500/20">
+               {errorMessage}
+             </div>
+          )}
 
-          <button 
-            onClick={handleSelectKey}
-            className="w-full py-4 bg-white text-slate-950 font-bold rounded-xl hover:bg-indigo-50 transition-all flex items-center justify-center gap-2 group"
-          >
-            <Key size={20} className="group-hover:scale-110 transition-transform" />
-            Connect Google Cloud Project
-          </button>
+          {isIdxEnvironment ? (
+            /* Google IDX / AI Studio Environment */
+            <div className="space-y-4">
+              <div className="p-4 bg-slate-800/50 rounded-xl border border-slate-700/50 text-sm text-slate-300">
+                To use the high-quality image model, select your Google Cloud Project.
+              </div>
+              <button 
+                onClick={handleSelectKey}
+                className="w-full py-4 bg-white text-slate-950 font-bold rounded-xl hover:bg-indigo-50 transition-all flex items-center justify-center gap-2 group"
+              >
+                <Key size={20} className="group-hover:scale-110 transition-transform" />
+                Connect Google Cloud Project
+              </button>
+            </div>
+          ) : (
+            /* Vercel / Public Web Environment Fallback */
+            <form onSubmit={handleManualKeySubmit} className="space-y-4 text-left">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-300">Enter Gemini API Key</label>
+                <div className="relative">
+                  <Key size={16} className="absolute left-3 top-3.5 text-slate-500" />
+                  <input 
+                    type="password"
+                    value={customApiKey}
+                    onChange={(e) => setCustomApiKey(e.target.value)}
+                    placeholder="AIza..."
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl py-3 pl-10 pr-4 text-slate-200 focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all"
+                  />
+                </div>
+                <p className="text-xs text-slate-500">
+                  Your key is used only in your browser to call Gemini directly.
+                </p>
+              </div>
+              <button 
+                type="submit"
+                className="w-full py-3.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-indigo-500/20 flex items-center justify-center gap-2"
+              >
+                Start Studio <ArrowRight size={16} />
+              </button>
+            </form>
+          )}
 
           <p className="text-xs text-slate-500">
-            Learn more about <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noreferrer" className="text-indigo-400 hover:text-indigo-300 underline">API billing and pricing</a>.
+            Get an API key from <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-indigo-400 hover:text-indigo-300 underline">Google AI Studio</a>.
           </p>
         </div>
       </div>
     );
   }
 
+  // Main App Interface
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 selection:bg-indigo-500/30">
       
@@ -177,10 +248,10 @@ const App: React.FC = () => {
             <span className="hidden sm:block">Powered by Gemini 3 Pro</span>
             <div className="h-4 w-px bg-slate-700 hidden sm:block"></div>
             <button 
-              onClick={handleSelectKey} 
+              onClick={isIdxEnvironment ? handleSelectKey : handleChangeKey} 
               className="hover:text-white transition-colors flex items-center gap-1.5"
             >
-               <Key size={14} /> Change Key
+               <Key size={14} /> {isIdxEnvironment ? "Change Project" : "Change Key"}
             </button>
           </div>
         </div>
