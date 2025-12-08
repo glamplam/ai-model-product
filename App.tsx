@@ -66,10 +66,17 @@ const App: React.FC = () => {
 
   const handleManualKeySubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (customApiKey.trim().length > 10) {
+    // Strictly sanitize key: remove anything that isn't a letter, number, hyphen, or underscore
+    // This fixes the "String contains non ISO-8859-1 code point" error
+    const sanitizedKey = customApiKey.replace(/[^a-zA-Z0-9\-_]/g, '');
+    
+    setCustomApiKey(sanitizedKey);
+
+    if (sanitizedKey.length > 10) {
       setHasApiKey(true);
+      setErrorMessage(null);
     } else {
-      setErrorMessage("Please enter a valid API Key.");
+      setErrorMessage("Please enter a valid API Key (remove spaces or special characters).");
     }
   };
 
@@ -93,6 +100,8 @@ const App: React.FC = () => {
         msg = "Session expired or invalid key. Please reconnect.";
       } else {
          msg = "Invalid API Key or API error. Please check your key.";
+         // Optional: Reset key state if it's definitely invalid, but let user read msg first
+         // setHasApiKey(false);
       }
     }
     setErrorMessage(msg);

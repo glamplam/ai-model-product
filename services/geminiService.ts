@@ -17,7 +17,9 @@ export const generateCompositeImage = async (
   apiKey?: string
 ): Promise<string> => {
   
-  const key = apiKey || process.env.API_KEY;
+  // Clean the key immediately to prevent header errors
+  const rawKey = apiKey || process.env.API_KEY;
+  const key = rawKey?.trim();
 
   if (!key) {
     throw new Error("API Key is missing. Please provide an API key.");
@@ -60,7 +62,7 @@ export const generateCompositeImage = async (
 
   // Retry Logic
   let lastError;
-  const maxRetries = 3;
+  const maxRetries = 5; // Increased retries for heavy load
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
@@ -100,7 +102,7 @@ export const generateCompositeImage = async (
         (error.message && (error.message.includes("overloaded") || error.message.includes("Internal error")));
 
       if (isRetryable && attempt < maxRetries - 1) {
-        // Exponential backoff: 2s, 4s, 8s
+        // Exponential backoff: 2s, 4s, 8s, 16s...
         const delay = Math.pow(2, attempt + 1) * 1000;
         console.log(`Retrying in ${delay}ms...`);
         await wait(delay);
@@ -120,7 +122,9 @@ export const editGeneratedImage = async (
   prompt: string,
   apiKey?: string
 ): Promise<string> => {
-  const key = apiKey || process.env.API_KEY;
+  const rawKey = apiKey || process.env.API_KEY;
+  const key = rawKey?.trim();
+  
   if (!key) {
     throw new Error("API Key is missing.");
   }
@@ -139,7 +143,7 @@ export const editGeneratedImage = async (
 
   // Retry Logic for Edit
   let lastError;
-  const maxRetries = 3;
+  const maxRetries = 5;
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
