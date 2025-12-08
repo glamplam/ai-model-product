@@ -1,0 +1,5 @@
+{
+  "name": "Virtual Studio AI",
+  "description": "A professional AI studio that combines product and model images into realistic composition shots using Gemini 2.5 Flash Image. Features text-based image editing and refinement.",
+  "requestFramePermissions": []
+}
