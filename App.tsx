@@ -81,19 +81,21 @@ const App: React.FC = () => {
 
   const handleApiError = (err: any) => {
     setStatus(AppStatus.ERROR);
-    const msg = err.message || "An error occurred";
-    setErrorMessage(msg);
+    let msg = err.message || "An error occurred";
     
-    if (msg.includes("API Key is missing") || msg.includes("Requested entity was not found") || msg.includes("403")) {
+    // Improve error messages for common issues
+    if (JSON.stringify(err).includes("500") || msg.includes("Internal error")) {
+      msg = "Server busy or prompt too complex. Please try again in a few seconds.";
+    } else if (msg.includes("API Key is missing") || msg.includes("Requested entity was not found") || msg.includes("403")) {
       // Don't fully reset if it's just a momentary glitch, but provide feedback
       if (isIdxEnvironment) {
         setHasApiKey(false);
-        setErrorMessage("Session expired or invalid key. Please reconnect.");
+        msg = "Session expired or invalid key. Please reconnect.";
       } else {
-         // Allow retry with same key or new key
-         setErrorMessage("Invalid API Key or API error. Please check your key.");
+         msg = "Invalid API Key or API error. Please check your key.";
       }
     }
+    setErrorMessage(msg);
   };
 
   // Handlers

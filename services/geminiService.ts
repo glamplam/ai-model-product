@@ -22,48 +22,37 @@ export const generateCompositeImage = async (
 
   const ai = new GoogleGenAI({ apiKey: key });
   
-  const systemPrompt = `
-    You are an expert fashion compositor, digital retoucher, and product photographer.
+  // Separate complex logic into systemInstruction to avoid confusing the model in the content stream
+  const systemInstruction = `
+    You are an expert fashion compositor and digital retoucher.
     
-    INPUTS:
-    1. **Model Reference**: An image of a person.
-    2. **Product Reference**: An image of a specific product (clothing, accessory, or item).
-    3. **User Instructions**: Text describing the desired pose, action, or setting.
+    TASK:
+    Generate a high-quality photorealistic image of the person from the 'Model Reference' WEARING the item from the 'Product Reference'.
 
-    YOUR TASK:
-    Generate a high-quality photorealistic image of the person from the 'Model Reference' **WEARING** or **USING** the item from the 'Product Reference'.
-
-    CRITICAL RULES FOR PRODUCT FIDELITY (HIGHEST PRIORITY):
-    - **SOURCE OF TRUTH**: The 'Product Reference' image is the absolute authority for the product's appearance. 
-    - **EXACT MATCH**: You MUST preserve the product's exact **color, texture, pattern, logos, text, and material**. Do NOT hallucinate new designs or change the product's style.
-    - **REALISTIC FIT**: Warp and drape the product naturally onto the model's body in the requested pose. Ensure realistic folds, shadows, and lighting that match the scene.
-
-    CRITICAL RULES FOR POSE & EDITING:
-    - **POSE CONTROL**: Prioritize the **User Instructions** for the pose. If the user says "sitting", "running", or "raising arms", the model MUST be generated in that pose, even if it differs from the original image.
-    - **IDENTITY**: Keep the model's facial features, hair, and body type consistent with the 'Model Reference'.
-    - **INTEGRATION**: The product must replace the model's original clothing if it is a garment.
-
-    OUTPUT:
-    - A single, high-resolution, photorealistic image.
+    STRICT RULES:
+    1. **Product Fidelity**: The 'Product Reference' is the source of truth. You MUST match its color, texture, logo, and material exactly.
+    2. **Model Identity**: Preserve the facial features and body type of the 'Model Reference'.
+    3. **Pose & Setting**: Follow the 'User Instructions' for the pose and scene. If the user specifies a pose (e.g., sitting, running), adapt the model to that pose.
+    4. **Realism**: Ensure realistic lighting, shadows, and fabric drape.
   `;
 
+  // Simplify the content parts to just the inputs
   const parts: Part[] = [
-    { text: systemPrompt },
-    { text: "IMAGE 1: Model Reference (Keep Identity):" },
+    { text: "Model Reference:" },
     {
       inlineData: {
         data: modelImageBase64,
         mimeType: modelMimeType
       }
     },
-    { text: "IMAGE 2: Product Reference (Source of Truth for Item):" },
+    { text: "Product Reference:" },
     {
       inlineData: {
         data: productImageBase64,
         mimeType: productMimeType
       }
     },
-    { text: `COMMAND: Generate the model from Image 1 WEARING the product from Image 2. \nSPECIFIC POSE/SCENE INSTRUCTIONS: ${userPrompt}` }
+    { text: `User Instructions: ${userPrompt}` }
   ];
 
   try {
@@ -71,6 +60,7 @@ export const generateCompositeImage = async (
       model: 'gemini-3-pro-image-preview',
       contents: { parts },
       config: {
+        systemInstruction: systemInstruction, // Moved here
         imageConfig: {
           imageSize: "1K",
           aspectRatio: "1:1"
@@ -111,7 +101,7 @@ export const editGeneratedImage = async (
     {
       inlineData: {
         data: imageBase64,
-        mimeType: 'image/png' // Assuming generated images are PNG
+        mimeType: 'image/png'
       }
     },
     { text: `Edit instruction: ${prompt}` }
