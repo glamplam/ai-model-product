@@ -12,7 +12,12 @@ import {
   Sparkles,
   UserCheck,
   Key,
-  ArrowRight
+  ArrowRight,
+  Monitor,
+  Smartphone,
+  Square,
+  RectangleHorizontal,
+  RectangleVertical
 } from 'lucide-react';
 
 const PRESET_PROMPTS = [
@@ -21,6 +26,14 @@ const PRESET_PROMPTS = [
   "Close-up portrait, holding the product near face.",
   "Model jumping joyfully wearing the product.",
   "Side profile shot wearing the product, dramatic lighting."
+];
+
+const ASPECT_RATIOS = [
+  { label: "1:1", value: "1:1", icon: Square },
+  { label: "3:4", value: "3:4", icon: RectangleVertical },
+  { label: "4:3", value: "4:3", icon: RectangleHorizontal },
+  { label: "9:16", value: "9:16", icon: Smartphone },
+  { label: "16:9", value: "16:9", icon: Monitor },
 ];
 
 const App: React.FC = () => {
@@ -36,6 +49,7 @@ const App: React.FC = () => {
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
   const [prompt, setPrompt] = useState<string>("");
   const [editPrompt, setEditPrompt] = useState<string>("");
+  const [aspectRatio, setAspectRatio] = useState<string>("1:1");
 
   // Check for API Key or Environment on mount
   useEffect(() => {
@@ -126,6 +140,7 @@ const App: React.FC = () => {
         productImage.base64Data,
         productImage.mimeType,
         finalPrompt,
+        aspectRatio,
         customApiKey || undefined
       );
       setGeneratedImage(resultBase64);
@@ -146,6 +161,7 @@ const App: React.FC = () => {
       const resultBase64 = await editGeneratedImage(
         base64Part, 
         editPrompt,
+        aspectRatio,
         customApiKey || undefined
       );
       setGeneratedImage(resultBase64);
@@ -318,6 +334,32 @@ const App: React.FC = () => {
                   placeholder="Describe the desired pose (e.g., 'Sitting on a bench', 'Running'). AI will adapt the model to this pose while wearing the product."
                   className="w-full h-32 bg-slate-950 border border-slate-700 rounded-xl p-3 text-sm focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none resize-none text-slate-200 placeholder:text-slate-600 transition-all"
                 />
+              </div>
+
+              {/* Aspect Ratio Selector - Refactored to Grid */}
+              <div className="space-y-3 mb-4">
+                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Aspect Ratio</span>
+                <div className="grid grid-cols-5 gap-2">
+                  {ASPECT_RATIOS.map((ratio) => {
+                    const Icon = ratio.icon;
+                    const isSelected = aspectRatio === ratio.value;
+                    return (
+                      <button
+                        key={ratio.value}
+                        onClick={() => setAspectRatio(ratio.value)}
+                        className={`flex flex-col items-center justify-center gap-1.5 py-2 rounded-xl border transition-all duration-200
+                          ${isSelected 
+                            ? 'bg-indigo-500/20 border-indigo-500 text-indigo-300 shadow-sm shadow-indigo-500/10' 
+                            : 'bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-500 hover:bg-slate-700/50'
+                          }`}
+                        title={ratio.label}
+                      >
+                        <Icon size={18} />
+                        <span className="text-[10px] font-medium">{ratio.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
               <div className="space-y-2 mb-6">

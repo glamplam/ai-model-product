@@ -14,6 +14,7 @@ export const generateCompositeImage = async (
   productImageBase64: string,
   productMimeType: string,
   userPrompt: string,
+  aspectRatio: string,
   apiKey?: string
 ): Promise<string> => {
   
@@ -83,7 +84,7 @@ export const generateCompositeImage = async (
           imageConfig: {
             // Upgraded to 2K for better text/logo detail resolution
             imageSize: "2K",
-            aspectRatio: "1:1"
+            aspectRatio: aspectRatio
           }
         }
       });
@@ -130,6 +131,7 @@ export const generateCompositeImage = async (
 export const editGeneratedImage = async (
   imageBase64: string,
   prompt: string,
+  aspectRatio: string,
   apiKey?: string
 ): Promise<string> => {
   const rawKey = apiKey || process.env.API_KEY;
@@ -164,7 +166,7 @@ export const editGeneratedImage = async (
           imageConfig: {
             // Upgraded to 2K for edits as well
             imageSize: "2K",
-            aspectRatio: "1:1"
+            aspectRatio: aspectRatio
           }
         }
       });
